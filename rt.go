@@ -98,15 +98,23 @@ func (v vector) actualPoint(start point) point {
 	return point{dx0, dy0, dz0}
 }
 
-/*
-func (s sphere) reflect(r ray) color.Color {
+func (s sphere) reflect(r ray, o []object, pLight point) color.Color {
 	pointp := r.direction.unit().actualPoint(r.origin)
 	pointp1 := vector{r.origin, pointp}.unit().scale(s.collision(r)).actualPoint(r.origin)
 	normal := vector{s.center, pointp1}
-	rPoint := ray.direction.unit().actualPoint(ray.direction.unit().dot(normal.unit()) * 2)
-	rRay := ray{pointp1, vector{pointp1, rPoint}}
-
-}*/
+	normalScale := -r.direction.unit().dot(normal.unit()) * 2
+	pP := normal.unit().scale(normalScale).p1
+	rPoint := r.direction.unit().actualPoint(pP)
+	rRay := ray{pointp1, vector{rPoint, pointp1}}
+	for _, n := range o {
+		fmt.Println(n.collision(rRay), rRay)
+		if n.collision(rRay) > 0 {
+			cc := n.shade(rRay, pLight)
+			return cc
+		}
+	}
+	return s.shade(r, pLight)
+}
 
 func (s sphere) shade(r ray, pLight point) color.Color {
 	pointp := r.direction.unit().actualPoint(r.origin)
@@ -162,6 +170,7 @@ type object interface {
 	collision(ray) float64
 	getColor() color.Color
 	shade(r ray, pLight point) color.Color
+	reflect(r ray, o []object, pLight point) color.Color
 }
 
 func main() {
@@ -172,12 +181,8 @@ func main() {
 	}
 	defer myfile.Close()
 	fmt.Println("Running...")
-	myObjects := [6]object{sphere{point{100, -25, 0}, 80, color.RGBA{255, 255, 255, 255}},
-		sphere{point{100, 200, 20}, 80, color.RGBA{200, 200, 00, 255}},
-		sphere{point{150, -3, -2}, 100, color.RGBA{255, 0, 255, 255}},
-		sphere{point{150, -340, -200}, 65, color.RGBA{255, 0, 0, 255}},
-		sphere{point{10, -10, -300}, 7, color.RGBA{0, 255, 0, 255}},
-		sphere{point{80, -150, 150}, 10, color.RGBA{128, 128, 255, 255}},
+	myObjects := [2]object{sphere{point{500, 100, -100}, 80, color.RGBA{255, 255, 255, 255}},
+		sphere{point{150, 100, 100}, 100, color.RGBA{200, 200, 00, 255}},
 	}
 	//mySphere := sphere{point{100, 0, 0}, 80, myColor{255, 0, 0}}
 	myScreen := screen{800, 800, point{-5000, 0, 0}}
@@ -196,7 +201,12 @@ func main() {
 			}
 			if len(pointList) > 0 {
 				//fmt.Println(obj.collision(r))
-				output.Set(row, column, pointList[0].shade(r, point{10, -80, -80}))
+				_, _, BB, _ := pointList[0].getColor().RGBA()
+				if BB == 65535 {
+					output.Set(row, column, pointList[0].reflect(r, myObjects[1:], point{10, -80, -80}))
+				} else {
+					output.Set(row, column, pointList[0].shade(r, point{10, -80, -80}))
+				}
 			} else {
 				output.Set(row, column, color.RGBA{80, 80, 80, 255})
 			}
